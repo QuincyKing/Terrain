@@ -67,10 +67,10 @@ template<class T, class ForwardIterator1, class ForwardIterator2>
 class TKriging : public TInterpolater<ForwardIterator2>
 {
 public:
-	TKriging(int levels)
+	TKriging(int levels, int num)
 	{
 		DBUtil *DBU = new DBUtil();
-		DBU->ReadData("terrainData", input);
+		DBU->ReadData("terrainData", input, num);
 		H.push_back(0.0);
 		for (size_t index = 0; index < input.size() - 1; index++)
 		{

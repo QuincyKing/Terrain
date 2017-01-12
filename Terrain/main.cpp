@@ -8,6 +8,7 @@
 #include "Sag.h"
 #include "KeyLevel.h"
 #include "Math.h"
+#include "InputReader.h"
 #include <d3d9.h>
 #include <d3dx9.h>
 #include <tchar.h>
@@ -15,6 +16,8 @@
 #include <Windows.h>
 #include <algorithm>
 #include <memory>
+#include <CEGUI\CEGUI.h>
+#include <CEGUI\RendererModules\Direct3D9\Renderer.h>
 using namespace std;
 
 #pragma comment(lib, "winmm.lib")
@@ -24,10 +27,9 @@ using namespace std;
 #pragma comment(lib, "dxguid.lib")
 
 #define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 600
+#define WINDOW_HEIGHT 700
 #define WINDOW_TITLE L"»˝Œ¨µÿ÷ Õº"
 #define D3DFVF_CUSTOMVERTEX  (D3DFVF_XYZ | D3DFVF_TEX1)
-
 
 wchar_t					g_strFPS[50];
 IDirect3DDevice9		*device = 0;
@@ -49,16 +51,18 @@ TerrainModel			UTM;
 D3DXMATRIX				g_projection;
 int						flag = 0;
 int						upgrade = 1;
-extern std::vector<double> H;
+extern vector<double> H;
 extern double mm;
-std::vector<double> E = { 0.0, 44.0, 32.1, 12.1, 38.0, 16.0, 38.0};
-std::vector<double> V = { 18.0, 26.0, 25.0, 24.0, 26.0, 13.0, 26.0};
+vector<double> E;
+vector<double> V;
 vector<double> mP0; 
 const double mPi = 400000; 
 const double mQi = 400000; 
-const vector<double> &mK = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+vector<double> mK;
 const double mq = 1.1;
 const double mbeta = BasicLib::ToRadian(5.0);
+
+//#pragma comment(linker, "/subsystem:console /entry:WinMainCRTStartup")
 
 struct CUSTOMVERTEX
 {
@@ -73,7 +77,7 @@ struct CUSTOMVERTEX
 
 LRESULT CALLBACK		WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 HRESULT					Direct3D_Init(HWND hwnd);
-HRESULT					Objects_Init(HWND hwnd);
+HRESULT					Objects_Init();
 VOID					Direct3D_Render(HWND hwnd);
 VOID					Direct3D_CleanUp();
 VOID					Direct3D_Update(HWND hwnd);
@@ -81,8 +85,10 @@ BOOL					Device_Read(IDirectInputDevice8 *pDIDevice, void* pBuffer, long lSize);
 float					Get_FPS();
 VOID					InputModel(TerrainModel &terrainModel);
 VOID					SagUpgrade(const vector<double>, const double, const double, const vector<double> &, const double, const double, const double);
-VOID					UpgradeInit(HWND hwnd);
+VOID					UpgradeInit();
 VOID					CalP0(vector<double> &P0);
+VOID					CEGUICreate();
+VOID					CEGUIDestroy();
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
@@ -132,7 +138,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			Direct3D_Update(hwnd);
 		}
 	}
-
+	CEGUIDestroy();
 	UnregisterClass(L"Terrain", wndClass.hInstance);  
 	return 0;
 }
@@ -148,13 +154,24 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 	case WM_KEYDOWN:					
 		if (wParam == VK_ESCAPE)    
-			DestroyWindow(hwnd);		
-		break;									
+			DestroyWindow(hwnd);
+		break;		
+
+	case WM_KEYUP:
+		if (wParam == VK_ESCAPE) PostQuitMessage(0);
+		break;
+
+	case WM_LBUTTONDOWN:
+		CEGUI::System::getSingleton().getDefaultGUIContext().injectMouseButtonClick(CEGUI::MouseButton::LeftButton);
+		break;
 
 	case WM_DESTROY:					
 		Direct3D_CleanUp();			
 		PostQuitMessage(0);			
-		break;								
+		break;	
+
+	case WM_MOUSEMOVE:
+		CEGUI::System::getSingleton().getDefaultGUIContext().injectMousePosition((float)(LOWORD(lParam)), (float)(HIWORD(lParam)));
 
 	default:										
 		return DefWindowProc(hwnd, message, wParam, lParam);		
@@ -209,15 +226,111 @@ HRESULT Direct3D_Init(HWND hwnd)
 	}
 	SAFE_RELEASE(d3d9);
 
-	//device->SetRenderState(D3DRS_LIGHTING, FALSE);
-	//device->SetRenderState(D3DRS_ZENABLE, TRUE);
-	Objects_Init(hwnd);
+	Objects_Init();
+	CEGUICreate();
 	return S_OK;
 }
 
-HRESULT Objects_Init(HWND hwnd)
+bool onPushButtonClicked(const CEGUI::EventArgs &e)
 {
-	Kriging kriging(7);
+	return true;
+}
+
+void CEGUICreate()
+{
+	CEGUI::Direct3D9Renderer* myRenderer = &CEGUI::Direct3D9Renderer::bootstrapSystem(device);
+
+	CEGUI::DefaultResourceProvider* rp = static_cast<CEGUI::DefaultResourceProvider*>(CEGUI::System::getSingleton().getResourceProvider());
+	rp->setResourceGroupDirectory("schemes", "GUI/schemes/");
+	rp->setResourceGroupDirectory("imagesets", "GUI/imagesets/");
+	rp->setResourceGroupDirectory("fonts", "GUI/fonts/");
+	rp->setResourceGroupDirectory("layouts", "GUI/layouts/");
+	rp->setResourceGroupDirectory("looknfeels", "GUI/looknfeel/");
+	rp->setResourceGroupDirectory("lua_scripts", "GUI/lua_scripts/");
+	rp->setResourceGroupDirectory("schemas", "GUI/xml_schemas/");
+
+	CEGUI::ImageManager::setImagesetDefaultResourceGroup("imagesets");
+	CEGUI::Font::setDefaultResourceGroup("fonts");
+	CEGUI::Scheme::setDefaultResourceGroup("schemes");
+	CEGUI::WidgetLookManager::setDefaultResourceGroup("looknfeels");
+	CEGUI::WindowManager::setDefaultResourceGroup("layouts");
+	CEGUI::ScriptModule::setDefaultResourceGroup("lua_scripts");
+
+	CEGUI::SchemeManager::getSingleton().createFromFile("TaharezLook.scheme");
+	CEGUI::FontManager::getSingleton().createFromFile("DejaVuSans-10.font");
+	CEGUI::System::getSingleton().getDefaultGUIContext().setDefaultFont("DejaVuSans-10");
+	CEGUI::WindowManager& wmgr = CEGUI::WindowManager::getSingleton();
+	CEGUI::Window* myRoot = wmgr.createWindow("DefaultWindow", "root");
+	CEGUI::System::getSingleton().getDefaultGUIContext().setRootWindow(myRoot);
+
+	CEGUI::Editbox * PiEBT = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "PiEBT"));
+	myRoot->addChild(PiEBT);
+	PiEBT->setPosition(CEGUI::UVector2(cegui_reldim(0.1f), cegui_reldim(0.8f)));
+	PiEBT->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
+	PiEBT->setText("   Pi");
+
+	CEGUI::Editbox * PIEB = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "PiEB"));
+	myRoot->addChild(PIEB);
+	PIEB->setPosition(CEGUI::UVector2(cegui_reldim(0.15f), cegui_reldim(0.8f)));
+	PIEB->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
+
+	CEGUI::Editbox * QiEBT = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "QiEBT"));
+	myRoot->addChild(QiEBT);
+	QiEBT->setPosition(CEGUI::UVector2(cegui_reldim(0.20f), cegui_reldim(0.8f)));
+	QiEBT->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
+	QiEBT->setText("   Qi");
+
+	CEGUI::Editbox * QiEB = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "QiEB"));
+	myRoot->addChild(QiEB);
+	QiEB->setPosition(CEGUI::UVector2(cegui_reldim(0.25f), cegui_reldim(0.8f)));
+	QiEB->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
+
+	CEGUI::Editbox * qEBT = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "qEBT"));
+	myRoot->addChild(qEBT);
+	qEBT->setPosition(CEGUI::UVector2(cegui_reldim(0.1f), cegui_reldim(0.85f)));
+	qEBT->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
+	qEBT->setText("   q");
+
+	CEGUI::Editbox * qEB = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "qEB"));
+	myRoot->addChild(qEB);
+	qEB->setPosition(CEGUI::UVector2(cegui_reldim(0.15f), cegui_reldim(0.85f)));
+	qEB->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
+
+	CEGUI::Editbox * betaEBT = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "betaEBT"));
+	myRoot->addChild(betaEBT);
+	betaEBT->setPosition(CEGUI::UVector2(cegui_reldim(0.20f), cegui_reldim(0.85f)));
+	betaEBT->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
+	betaEBT->setText(" beta");
+
+	CEGUI::Editbox * betaEB = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "betaEB"));
+	myRoot->addChild(betaEB);
+	betaEB->setPosition(CEGUI::UVector2(cegui_reldim(0.25f), cegui_reldim(0.85f)));
+	betaEB->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
+
+	CEGUI::PushButton * pushButton = static_cast<CEGUI::PushButton*>(wmgr.createWindow("TaharezLook/Button", "Submit"));
+	myRoot->addChild(pushButton);
+	pushButton->setPosition(CEGUI::UVector2(cegui_reldim(0.1f), cegui_reldim(0.90f)));
+	pushButton->setSize(CEGUI::USize(cegui_reldim(0.1f), cegui_reldim(0.05f)));
+	pushButton->setText("submit");
+
+	pushButton->subscribeEvent(CEGUI::PushButton::EventClicked, &onPushButtonClicked);
+}
+
+void CEGUIDestroy()
+{
+	CEGUI::Renderer *renderer = CEGUI::System::getSingleton().getRenderer();
+	CEGUI::Direct3D9Renderer::destroy(
+		*static_cast<CEGUI::Direct3D9Renderer*>(renderer));
+	renderer = 0;
+}
+
+HRESULT Objects_Init()
+{
+	shared_ptr<InputReader<double> > ir = make_shared<InputReader<double> >("info");
+	pair<int, int> information= ir->InputDataBase();
+	DBUtil *dbu = new DBUtil();
+	dbu->ReadParaData(E, V, mK);
+	Kriging kriging(information.first, information.second);
 	InputModel(terrainModel);
 	const int count = 8*terrainModel.m_gtp.m_GTPSet.size();
 	D3DXCreateFont(device, 18, 0, 0, 1, false, DEFAULT_CHARSET,
@@ -240,7 +353,7 @@ HRESULT Objects_Init(HWND hwnd)
 	g_pVertexBuffer->Unlock();
 	CalP0(mP0);
 	SagUpgrade(mP0, mPi, mQi, mK, mm, mq, mbeta);
-	UpgradeInit(hwnd);
+	UpgradeInit();
 
 	g_pCamera = new CameraClass(device);
 	g_pCamera->SetCameraPosition(&D3DXVECTOR3(1200.0f, 548.03f, 1200.49f));
@@ -261,7 +374,7 @@ HRESULT Objects_Init(HWND hwnd)
 	return S_OK;
 }
 
-void UpgradeInit(HWND hwnd)
+void UpgradeInit()
 {
 	const int count = 8 * UTM.m_gtp.m_GTPSet.size();
 	device->CreateVertexBuffer(3 * count*sizeof(CUSTOMVERTEX), 0,
@@ -281,20 +394,53 @@ void UpgradeInit(HWND hwnd)
 	g_pUpgradeVertexBuffer->Unlock();
 }
 
+void  UnitFrameStates()
+{
+	device->SetFVF(NULL);
+
+	device->SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
+	device->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
+	device->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+	device->SetRenderState(D3DRS_ZWRITEENABLE, TRUE);
+	device->SetRenderState(D3DRS_FOGENABLE, FALSE);
+
+	device->SetSamplerState(0, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP);
+	device->SetSamplerState(0, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP);
+
+	device->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+	device->SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_CURRENT);
+	device->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+
+	device->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+	device->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_CURRENT);
+	device->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
+
+	device->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+	device->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+
+	device->SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+
+	device->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+	device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
+	device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO);
+}
+
 void Direct3D_Render(HWND hwnd)
 {
 	device->Clear(0, NULL, D3DCLEAR_TARGET|D3DCLEAR_ZBUFFER, 0xffffff, 1.0f, 0);
 	RECT formatRect;
 	GetClientRect(hwnd, &formatRect);
 	vector<double> tm;
+	
 	for (int f = 0; f < 11; f++)
 	{
 		tm.push_back(terrainModel.m_ver[f].z - UTM.m_ver[f].z);
 	}
+	
+	device->BeginScene();
+	
 	if (upgrade == 1)
 	{
-		device->BeginScene();
-
 		device->SetFVF(D3DFVF_CUSTOMVERTEX);
 		device->SetStreamSource(0, g_pVertexBuffer, 0, sizeof(CUSTOMVERTEX));
 		int nums = 24 * terrainModel.m_gtp.m_GTPSet.size() / terrainModel.m_z;
@@ -322,15 +468,9 @@ void Direct3D_Render(HWND hwnd)
 		device->DrawPrimitive(D3DPT_TRIANGLELIST, 3*nums1, nums2);
 		}*/
 		/*device->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, terrainModel.m_ver.m_vertices.size(), 0, terrainModel.m_ts.m_triangleSet.size());*/
-		int charCount = swprintf_s(g_strFPS, 20, _T("FPS:%0.0f"), Get_FPS());
-		pFont->DrawText(NULL, g_strFPS, charCount, &formatRect, DT_TOP | DT_LEFT, D3DCOLOR_XRGB(0, 0, 0));
-		device->EndScene();
-		device->Present(0, 0, 0, 0);
 	}
 	else
 	{
-		device->BeginScene();
-		
 		device->SetFVF(D3DFVF_CUSTOMVERTEX);
 		device->SetStreamSource(0, g_pUpgradeVertexBuffer, 0, sizeof(CUSTOMVERTEX));
 		int nums = 24 * UTM.m_gtp.m_GTPSet.size() / UTM.m_z;
@@ -346,12 +486,13 @@ void Direct3D_Render(HWND hwnd)
 		device->DrawPrimitive(D3DPT_TRIANGLELIST, 4 * nums, nums);
 		device->SetTexture(0, g_pTexture6);
 		device->DrawPrimitive(D3DPT_TRIANGLELIST, 5 * nums, nums);
-
-		int charCount = swprintf_s(g_strFPS, 20, _T("FPS:%0.0f"), Get_FPS());
-		pFont->DrawText(NULL, g_strFPS, charCount, &formatRect, DT_TOP | DT_LEFT, D3DCOLOR_XRGB(0, 0, 0));
-		device->EndScene();
-		device->Present(0, 0, 0, 0);
 	}
+	int charCount = swprintf_s(g_strFPS, 20, _T("FPS:%0.0f"), Get_FPS());
+	pFont->DrawText(NULL, g_strFPS, charCount, &formatRect, DT_TOP | DT_LEFT, D3DCOLOR_XRGB(0, 0, 0));
+	CEGUI::System::getSingleton().renderAllGUIContexts();
+	UnitFrameStates();
+	device->EndScene();
+	device->Present(0, 0, 0, 0);
 }
 
 void SagUpgrade(const vector<double> P0, const double Pi, const double Qi, const vector<double> &K,
@@ -416,16 +557,6 @@ void Direct3D_Update(HWND hwnd)
 	if (g_pD3DInput->IsKeyDown(DIK_Q))		g_pCamera->RotationLookVec(0.001f);
 	if (g_pD3DInput->IsKeyDown(DIK_E))		g_pCamera->RotationLookVec(-0.001f);
 
-	if (g_pD3DInput->IsKeyDown(DIK_B) && flag == 0)
-	{
-		device->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
-		flag = 1;
-	}
-	else if (g_pD3DInput->IsKeyDown(DIK_V) && flag == 1)
-	{
-		device->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
-		flag = 0;
-	}
 	if (g_pD3DInput->IsMouseButtonDown(0))
 	{
 		g_pCamera->RotationUpVec(g_pD3DInput->MouseDX()* 0.001f);

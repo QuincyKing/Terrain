@@ -14,14 +14,16 @@ class DBUtil
 	_ConnectionPtr  m_pConnection;
 	_RecordsetPtr	m_pRecordset;
 	HRESULT  hr;
-	void _ReadData(Info &Data);
-	void _ReadData(Vertices &Data);
-	void _ReadData(vector<vector<Point3D> > &Data);
+	void _ReadData(Info &Data, int num);
+	void _ReadData(Vertices &Data, int num);
+	void _ReadData(vector<vector<Point3D> > &Data, int num);
+	
  public:
 	 DBUtil();
 	 ~DBUtil();
 	 template<typename T>
-	 void ReadData(string DBname, T &Data);
+	 void ReadData(string DBname, T &Data, int num = 0);
+	 void ReadParaData(vector<double> &E, vector<double> &V, vector<double> &K);
 	 void SQLQuery(char sql[100]);
 	 bool IsData(string DBname);
 };
@@ -62,7 +64,7 @@ DBUtil::~DBUtil()
 }
 
 template<typename T>
-void DBUtil::ReadData(string DBname, T &Data)
+void DBUtil::ReadData(string DBname, T &Data, int num)
 {
 	hr = m_pRecordset.CreateInstance(__uuidof(Recordset));
 	if (FAILED(hr))
@@ -80,10 +82,10 @@ void DBUtil::ReadData(string DBname, T &Data)
 		MessageBox(NULL, LPCWSTR("log"), LPCWSTR("failed!!!!"), NULL);
 	}
 
-	_ReadData(Data);
+	_ReadData(Data, num);
 }
 
-void DBUtil::_ReadData(Info &Data)
+void DBUtil::_ReadData(Info &Data, int num)
 {
 	int countx, county, countz;
 	m_pRecordset->MoveFirst();
@@ -93,20 +95,21 @@ void DBUtil::_ReadData(Info &Data)
 	Data.Put(countx, county, countz);
 }
 
-void DBUtil::_ReadData(vector<vector<Point3D> > &Data)
+void DBUtil::_ReadData(vector<vector<Point3D> > &Data, int num)
 {
 	float x, y, z;
-	for (int i = 1; i <= 7; i++)
+	m_pRecordset->MoveFirst();
+	vector<Point3D> level;
+	
+	while (!m_pRecordset->adoEOF)
 	{
-		m_pRecordset->MoveFirst();
-		char str[10];
-		sprintf_s(str, sizeof(str), "z%d", i);
-		vector<Point3D> level;
-		while (!m_pRecordset->adoEOF)
+		int i = 0;
+		level.clear();
+		while (!m_pRecordset->adoEOF&&i++!=num)
 		{
 			x = m_pRecordset->Fields->GetItem(_variant_t("x"))->Value;
 			y = m_pRecordset->Fields->GetItem(_variant_t("y"))->Value;
-			z = m_pRecordset->Fields->GetItem(_variant_t(str))->Value;
+			z = m_pRecordset->Fields->GetItem(_variant_t("z"))->Value;
 			level.push_back(Point3D(x, y, z));
 			m_pRecordset->MoveNext();
 		}
@@ -114,7 +117,7 @@ void DBUtil::_ReadData(vector<vector<Point3D> > &Data)
 	}
 }
 
-void DBUtil::_ReadData(Vertices &Data)
+void DBUtil::_ReadData(Vertices &Data, int num)
 {
 	float x, y, z;
 	m_pRecordset->MoveFirst();
@@ -124,6 +127,40 @@ void DBUtil::_ReadData(Vertices &Data)
 		y = m_pRecordset->Fields->GetItem(_variant_t("y"))->Value;
 		z = m_pRecordset->Fields->GetItem(_variant_t("z"))->Value;
 		Data.push(Point3D(x, y, z));
+		m_pRecordset->MoveNext();
+	}
+}
+
+void DBUtil::ReadParaData(vector<double> &E, vector<double> &V, vector<double> &K)
+{
+	double e, v, k;
+	E.clear();
+	V.clear();
+	K.clear();
+	hr = m_pRecordset.CreateInstance(__uuidof(Recordset));
+	if (FAILED(hr))
+	{
+		MessageBox(NULL, LPCWSTR("log"), LPCWSTR("failed!!!"), NULL);
+	}
+	try
+	{
+		char sql[50];
+		sprintf_s(sql, sizeof(sql), "SELECT * FROM %s", "para");
+		m_pRecordset->Open(sql, m_pConnection.GetInterfacePtr(), adOpenDynamic, adLockOptimistic, adCmdText);
+	}
+	catch (_com_error e)
+	{
+		MessageBox(NULL, LPCWSTR("log"), LPCWSTR("failed!!!!"), NULL);
+	}
+	m_pRecordset->MoveFirst();
+	while (!m_pRecordset->adoEOF)
+	{
+		e = m_pRecordset->Fields->GetItem(_variant_t("E"))->Value;
+		v = m_pRecordset->Fields->GetItem(_variant_t("V"))->Value;
+		k = m_pRecordset->Fields->GetItem(_variant_t("K"))->Value;
+		E.push_back(e);
+		V.push_back(v);
+		K.push_back(k);
 		m_pRecordset->MoveNext();
 	}
 }
