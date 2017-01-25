@@ -122,7 +122,7 @@ public:
 	uint16_t county;
 	uint16_t countz;
 public:
-	Info();
+	Info() {}
 	Info(uint16_t _countx, uint16_t _county, uint16_t _countz) :countx(_countx), county(_county), countz(_countz){ }
 	void Put(uint16_t _countx, uint16_t _county, uint16_t _countz)
 	{
@@ -132,4 +132,24 @@ public:
 	}
 };
 
+class Para
+{
+private:
+	std::vector<double> mE;
+	std::vector<double> mV;
+	std::vector<double> mK;
+public:
+	Para() {}
+	Para(std::vector<double> E, std::vector<double> V, std::vector<double> K)
+		:mE(E), mV(V), mK(K)
+	{
+	}
+	void PutE(std::vector<double> E)  {  mE = E; }
+	void PutV(std::vector<double> V)  {  mV = V; }
+	void PutK(std::vector<double> K)  {  mK = K; }
+
+	std::vector<double> GetE() { return mE; }
+	std::vector<double> GetV() { return mV; }
+	std::vector<double> GetK() { return mK; }
+};
 #endif

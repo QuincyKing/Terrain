@@ -3,9 +3,11 @@
 
 #include "Matrix.h"
 #include "Numeric.h"
-#include "DBUtil.h"
 #include "Interpolater.h"
 #include "BaseData.h"
+#include "RW/ReaderTerrainData.h"
+#include "RW/WriteData.h"
+#include "RW/WriteInfo.h"
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -67,10 +69,12 @@ template<class T, class ForwardIterator1, class ForwardIterator2>
 class TKriging : public TInterpolater<ForwardIterator2>
 {
 public:
-	TKriging(int levels, int num)
+	TKriging()
 	{
-		DBUtil *DBU = new DBUtil();
-		DBU->ReadData("terrainData", input, num);
+		int levels;
+		ReaderTerrainData<> *rbvv = new ReaderTerrainData<>("terrainData.te");
+		input = rbvv->GetData();
+		rbvv->GetLevels(levels);
 		H.push_back(0.0);
 		for (size_t index = 0; index < input.size() - 1; index++)
 		{
@@ -83,7 +87,8 @@ public:
 		}
 		mm = mm / input[0].size();
 
-		if (DBU->IsData("info"))
+		ReaderInfo<> *rdif = new ReaderInfo<>();
+		if (rdif->HasData())
 		{
 			return;
 		}
@@ -98,6 +103,7 @@ public:
 		int index_x = 0;
 		int countx = 0;
 		int county = 0;
+		WriteData<double> *wd = new WriteData<double>();
 		while (start1 != last1) 
 		{
 			 int index_y = 0;
@@ -136,7 +142,6 @@ public:
 			double x0, y0, x1, y1;
 			area(vecx, x0, x1);
 			area(vecy, y0, y1);
-			
 			int nDiameter = 200;
 			int nRadius = nDiameter / 2;
 			double xpos = x0, ypos = y0;
@@ -150,9 +155,7 @@ public:
 				{
 					countx++;
 					double z = GetInterpolatedZ(xpos, ypos, (*start1).begin(), (*start1).end(), m_nSize, m_matA, m_Permutation);
-					char sqlData[100];
-					sprintf_s(sqlData, sizeof(sqlData), "INSERT INTO data VALUES(%f, %f, %f)", xpos, ypos, z);
-					DBU->SQLQuery(sqlData);
+					wd->Write(xpos, ypos, z);
 					xpos += width;
 				}
 				county++;
@@ -162,9 +165,10 @@ public:
 			index_x++;
 			++start1;
 		}
-		char sqlInfo[100];
-		sprintf_s(sqlInfo, sizeof(sqlInfo), "INSERT INTO info VALUES(%d, %d, %d)", countx, county, index_x-1);
-		DBU->SQLQuery(sqlInfo);
+		WriteInfo<> *wi = new WriteInfo<>();
+		wi->Write(countx, county, index_x-1);
+		delete wi;
+		delete wd;
 	}
 
 private:

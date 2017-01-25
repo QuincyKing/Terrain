@@ -30,14 +30,17 @@ public:
 	{
 		m_vertices.push_back(data);
 	}
+
 	Point3D& operator[] (size_t index)
 	{
 		return m_vertices.at(index);
 	}
+
 	void clear()
 	{
 		m_vertices.clear();
 	}
+
 public:
 	vector<Point3D> m_vertices;
 };

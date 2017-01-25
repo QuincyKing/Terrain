@@ -4,11 +4,15 @@
 #include "D3DCameraClass.h"
 #include "D3DUtil.h"
 #include "BaseData.h"
-#include "DBUtil.h"
 #include "Sag.h"
 #include "KeyLevel.h"
 #include "Math.h"
-#include "InputReader.h"
+#include "RW/ReaderBase.h"
+#include "RW/WriteBase.h"
+#include "RW/ReaderInfo.h"
+#include "RW/ReaderTerrainData.h"
+#include "RW/ReaderData.h"
+#include "RW/ReaderPara.h"
 #include <d3d9.h>
 #include <d3dx9.h>
 #include <tchar.h>
@@ -16,8 +20,6 @@
 #include <Windows.h>
 #include <algorithm>
 #include <memory>
-#include <CEGUI\CEGUI.h>
-#include <CEGUI\RendererModules\Direct3D9\Renderer.h>
 using namespace std;
 
 #pragma comment(lib, "winmm.lib")
@@ -51,18 +53,21 @@ TerrainModel			UTM;
 D3DXMATRIX				g_projection;
 int						flag = 0;
 int						upgrade = 1;
+ReaderPara<>*			rp;
+ReaderInfo<>*			rif;
+ReaderData<>*			rdt;
 extern vector<double> H;
 extern double mm;
 vector<double> E;
 vector<double> V;
+vector<double> K;
 vector<double> mP0; 
 const double mPi = 400000; 
 const double mQi = 400000; 
-vector<double> mK;
 const double mq = 1.1;
 const double mbeta = BasicLib::ToRadian(5.0);
 
-//#pragma comment(linker, "/subsystem:console /entry:WinMainCRTStartup")
+#pragma comment(linker, "/subsystem:console /entry:WinMainCRTStartup")
 
 struct CUSTOMVERTEX
 {
@@ -87,8 +92,6 @@ VOID					InputModel(TerrainModel &terrainModel);
 VOID					SagUpgrade(const vector<double>, const double, const double, const vector<double> &, const double, const double, const double);
 VOID					UpgradeInit();
 VOID					CalP0(vector<double> &P0);
-VOID					CEGUICreate();
-VOID					CEGUIDestroy();
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
@@ -138,7 +141,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 			Direct3D_Update(hwnd);
 		}
 	}
-	CEGUIDestroy();
 	UnregisterClass(L"Terrain", wndClass.hInstance);  
 	return 0;
 }
@@ -161,17 +163,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 		if (wParam == VK_ESCAPE) PostQuitMessage(0);
 		break;
 
-	case WM_LBUTTONDOWN:
-		CEGUI::System::getSingleton().getDefaultGUIContext().injectMouseButtonClick(CEGUI::MouseButton::LeftButton);
-		break;
-
 	case WM_DESTROY:					
 		Direct3D_CleanUp();			
 		PostQuitMessage(0);			
 		break;	
-
-	case WM_MOUSEMOVE:
-		CEGUI::System::getSingleton().getDefaultGUIContext().injectMousePosition((float)(LOWORD(lParam)), (float)(HIWORD(lParam)));
 
 	default:										
 		return DefWindowProc(hwnd, message, wParam, lParam);		
@@ -227,110 +222,19 @@ HRESULT Direct3D_Init(HWND hwnd)
 	SAFE_RELEASE(d3d9);
 
 	Objects_Init();
-	CEGUICreate();
 	return S_OK;
-}
-
-bool onPushButtonClicked(const CEGUI::EventArgs &e)
-{
-	return true;
-}
-
-void CEGUICreate()
-{
-	CEGUI::Direct3D9Renderer* myRenderer = &CEGUI::Direct3D9Renderer::bootstrapSystem(device);
-
-	CEGUI::DefaultResourceProvider* rp = static_cast<CEGUI::DefaultResourceProvider*>(CEGUI::System::getSingleton().getResourceProvider());
-	rp->setResourceGroupDirectory("schemes", "GUI/schemes/");
-	rp->setResourceGroupDirectory("imagesets", "GUI/imagesets/");
-	rp->setResourceGroupDirectory("fonts", "GUI/fonts/");
-	rp->setResourceGroupDirectory("layouts", "GUI/layouts/");
-	rp->setResourceGroupDirectory("looknfeels", "GUI/looknfeel/");
-	rp->setResourceGroupDirectory("lua_scripts", "GUI/lua_scripts/");
-	rp->setResourceGroupDirectory("schemas", "GUI/xml_schemas/");
-
-	CEGUI::ImageManager::setImagesetDefaultResourceGroup("imagesets");
-	CEGUI::Font::setDefaultResourceGroup("fonts");
-	CEGUI::Scheme::setDefaultResourceGroup("schemes");
-	CEGUI::WidgetLookManager::setDefaultResourceGroup("looknfeels");
-	CEGUI::WindowManager::setDefaultResourceGroup("layouts");
-	CEGUI::ScriptModule::setDefaultResourceGroup("lua_scripts");
-
-	CEGUI::SchemeManager::getSingleton().createFromFile("TaharezLook.scheme");
-	CEGUI::FontManager::getSingleton().createFromFile("DejaVuSans-10.font");
-	CEGUI::System::getSingleton().getDefaultGUIContext().setDefaultFont("DejaVuSans-10");
-	CEGUI::WindowManager& wmgr = CEGUI::WindowManager::getSingleton();
-	CEGUI::Window* myRoot = wmgr.createWindow("DefaultWindow", "root");
-	CEGUI::System::getSingleton().getDefaultGUIContext().setRootWindow(myRoot);
-
-	CEGUI::Editbox * PiEBT = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "PiEBT"));
-	myRoot->addChild(PiEBT);
-	PiEBT->setPosition(CEGUI::UVector2(cegui_reldim(0.1f), cegui_reldim(0.8f)));
-	PiEBT->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
-	PiEBT->setText("   Pi");
-
-	CEGUI::Editbox * PIEB = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "PiEB"));
-	myRoot->addChild(PIEB);
-	PIEB->setPosition(CEGUI::UVector2(cegui_reldim(0.15f), cegui_reldim(0.8f)));
-	PIEB->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
-
-	CEGUI::Editbox * QiEBT = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "QiEBT"));
-	myRoot->addChild(QiEBT);
-	QiEBT->setPosition(CEGUI::UVector2(cegui_reldim(0.20f), cegui_reldim(0.8f)));
-	QiEBT->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
-	QiEBT->setText("   Qi");
-
-	CEGUI::Editbox * QiEB = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "QiEB"));
-	myRoot->addChild(QiEB);
-	QiEB->setPosition(CEGUI::UVector2(cegui_reldim(0.25f), cegui_reldim(0.8f)));
-	QiEB->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
-
-	CEGUI::Editbox * qEBT = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "qEBT"));
-	myRoot->addChild(qEBT);
-	qEBT->setPosition(CEGUI::UVector2(cegui_reldim(0.1f), cegui_reldim(0.85f)));
-	qEBT->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
-	qEBT->setText("   q");
-
-	CEGUI::Editbox * qEB = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "qEB"));
-	myRoot->addChild(qEB);
-	qEB->setPosition(CEGUI::UVector2(cegui_reldim(0.15f), cegui_reldim(0.85f)));
-	qEB->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
-
-	CEGUI::Editbox * betaEBT = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "betaEBT"));
-	myRoot->addChild(betaEBT);
-	betaEBT->setPosition(CEGUI::UVector2(cegui_reldim(0.20f), cegui_reldim(0.85f)));
-	betaEBT->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
-	betaEBT->setText(" beta");
-
-	CEGUI::Editbox * betaEB = static_cast<CEGUI::Editbox*>(wmgr.createWindow("TaharezLook/Editbox", "betaEB"));
-	myRoot->addChild(betaEB);
-	betaEB->setPosition(CEGUI::UVector2(cegui_reldim(0.25f), cegui_reldim(0.85f)));
-	betaEB->setSize(CEGUI::USize(cegui_reldim(0.05f), cegui_reldim(0.05f)));
-
-	CEGUI::PushButton * pushButton = static_cast<CEGUI::PushButton*>(wmgr.createWindow("TaharezLook/Button", "Submit"));
-	myRoot->addChild(pushButton);
-	pushButton->setPosition(CEGUI::UVector2(cegui_reldim(0.1f), cegui_reldim(0.90f)));
-	pushButton->setSize(CEGUI::USize(cegui_reldim(0.1f), cegui_reldim(0.05f)));
-	pushButton->setText("submit");
-
-	pushButton->subscribeEvent(CEGUI::PushButton::EventClicked, &onPushButtonClicked);
-}
-
-void CEGUIDestroy()
-{
-	CEGUI::Renderer *renderer = CEGUI::System::getSingleton().getRenderer();
-	CEGUI::Direct3D9Renderer::destroy(
-		*static_cast<CEGUI::Direct3D9Renderer*>(renderer));
-	renderer = 0;
 }
 
 HRESULT Objects_Init()
 {
-	shared_ptr<InputReader<double> > ir = make_shared<InputReader<double> >("info");
-	pair<int, int> information= ir->InputDataBase();
-	DBUtil *dbu = new DBUtil();
-	dbu->ReadParaData(E, V, mK);
-	Kriging kriging(information.first, information.second);
+	Para para;
+	rp = new ReaderPara<>("para.te");
+	para = rp->GetData();
+	E = para.GetE();
+	V = para.GetV();
+	K = para.GetK();
+	Kriging *kriging = new Kriging();
+	delete  kriging;
 	InputModel(terrainModel);
 	const int count = 8*terrainModel.m_gtp.m_GTPSet.size();
 	D3DXCreateFont(device, 18, 0, 0, 1, false, DEFAULT_CHARSET,
@@ -352,7 +256,7 @@ HRESULT Objects_Init()
 	}
 	g_pVertexBuffer->Unlock();
 	CalP0(mP0);
-	SagUpgrade(mP0, mPi, mQi, mK, mm, mq, mbeta);
+	SagUpgrade(mP0, mPi, mQi, K, mm, mq, mbeta);
 	UpgradeInit();
 
 	g_pCamera = new CameraClass(device);
@@ -489,7 +393,6 @@ void Direct3D_Render(HWND hwnd)
 	}
 	int charCount = swprintf_s(g_strFPS, 20, _T("FPS:%0.0f"), Get_FPS());
 	pFont->DrawText(NULL, g_strFPS, charCount, &formatRect, DT_TOP | DT_LEFT, D3DCOLOR_XRGB(0, 0, 0));
-	CEGUI::System::getSingleton().renderAllGUIContexts();
 	UnitFrameStates();
 	device->EndScene();
 	device->Present(0, 0, 0, 0);
@@ -585,14 +488,14 @@ void Direct3D_CleanUp()
 
 void InputModel(TerrainModel &terrainModel)
 {
-	Info info(0, 0, 0);
-	DBUtil *DBU = new DBUtil();
-	DBU->ReadData("info", info);
+	rif = new ReaderInfo<>("info.te");
+	Info info = rif->GetData();
 	terrainModel.m_x = info.countx;
 	terrainModel.m_y = info.county;
 	terrainModel.m_z = info.countz;
 
-	DBU->ReadData("data", terrainModel.m_ver);
+	rdt = new ReaderData<>("data.te");
+	terrainModel.m_ver = rdt->GetData();
 
 	int xPos, yPos, zPos;
 	int countTri = 0;

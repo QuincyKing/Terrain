@@ -30,9 +30,6 @@
     <ClInclude Include="D3DUtil.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="DBUtil.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="KeyLevel.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -54,7 +51,31 @@
     <ClInclude Include="TerrainModel.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="InputReader.h">
+    <ClInclude Include="Interpolater.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\WriteBase.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\ReaderBase.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\ReaderInfo.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\ReaderData.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\ReaderTerrainData.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\WriteData.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\ReaderPara.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\WriteInfo.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
