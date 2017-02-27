@@ -1,24 +1,22 @@
-#ifndef WriteInfo_h__
-#define WriteInfo_h__
+#pragma once
 
 #include "WriteBase.h"
 
-template<typename T = int>
+template<typename T>
 class WriteInfo : public WriteBase<T>
 {
 public:
-	WriteInfo() :WriteBase("info.te") {}
-	void Write(T, T, T);
+	WriteInfo() :WriteBase("./info.te") {}
+	void Execute(T, T, T);
 };
 
 template<typename T>
-void WriteInfo<T>::Write(T count_x, T count_y, T count_z)
+void WriteInfo<T>::Execute(T count_x, T count_y, T count_z)
 {
-	if (!m_out) return;
+	if (!mOut) return;
 	std::string line;
 	std::ostringstream oss(line);
 	oss << count_x << " " << count_y << " " << count_z << "\n";
 	std::string record = oss.str();
-	m_out.write(record.c_str(), record.length());
+	mOut.write(record.c_str(), record.length());
 }
-#endif
