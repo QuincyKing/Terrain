@@ -11,4 +11,4 @@
    ![effect](http://jinqifeng.me/pic/terrain/1.JPG)
 
 ### 建模流程图
-  ![pipe](http://jinqifeng.me/pic/terrain/2.JPG)
+  ![pipe](http://jinqifeng.me/pic/terrain/2.jpg)
