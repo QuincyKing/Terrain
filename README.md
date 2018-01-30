@@ -12,3 +12,10 @@
 
 ### 建模流程图
   ![pipe](http://jinqifeng.me/pic/terrain/2.jpg)
+  
+
+<details><summary>add/remove spaces</summary>
+- `sp_before_sparen`: _Add or remove space before '(' of 'if', 'for', 'switch', 'while', etc._
+
+- `sp_compare`: _Add or remove space around compare operator '<', '>', '==', etc_
+  </details>
