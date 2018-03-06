@@ -14,7 +14,7 @@ public:
 		 const double m, const double q, const double beta);
 
 	double Deflection(double x, double y, uint16_t level);
-	
+	double Deflection1(double x, double y, uint16_t level);
 private:
 	void SetAlpha(uint16_t level);
 
@@ -34,16 +34,32 @@ Sag::Sag(const std::vector<double> &P0, const double P, const double Q, const do
 								:mP(P), mQ(Q), mK(K), mM(m), mq(q), mBeta(beta)
 {
 	mP0 = P0;
+	mK = 10;
 }
  
+double Sag::Deflection1(double x, double y, uint16_t level)
+{
+	SetAlpha(level);
+
+	//x = x * 10; y = y * 10;
+	double sign = pow(-1, ceil(2 - mAlpha));
+	double invFactor = 1/(mAlpha * (mAlpha - 1) * (3 * mP + 3 * mQ + mP*mQ + mK*mP*mQ));
+	double tmp = x*x / (2 * mP) + y*y / (2 * mQ) - 1;
+	tmp = tmp * 180;
+	//double factor = mP0[level] * mP * mQ * pow(tmp, ceil(mAlpha));
+	double factor = 10 * mP * mQ * pow(tmp, ceil(mAlpha));
+	mResult = factor * sign * invFactor;
+	return mResult - 655;
+}
+
 double Sag::Deflection(double x, double y, uint16_t level)
 {
 	SetAlpha(level);
 
 	double sign = pow(-1, ceil(2 - mAlpha));
-	double invFactor = 1/(mAlpha * (mAlpha - 1) * (3 * mP + 3 * mQ + mP*mQ + mK*mP*mQ));
+	double invFactor = 1 / (mAlpha * (mAlpha - 1) * (3 * mP + 3 * mQ + mP*mQ + mK*mP*mQ));
 	double tmp = x*x / (2 * mP) + y*y / (2 * mQ) - 1;
-	double factor = mP0[level] * mP * mQ * pow(tmp, ceil(mAlpha));
+	double factor = 10 * mP * mQ * pow(tmp, ceil(mAlpha));
 	mResult = factor * sign * invFactor;
 	return mResult;
 }
@@ -52,7 +68,8 @@ void Sag::SetAlpha(uint16_t level)
 {
 	double invW0 = 1 / mM * mq * cos(mBeta);
 	double invFactor = 1 / (3 * mP + 3 * mQ + mP*mQ + mK*mP*mQ);
-	mAlpha = 1 / 2 + sqrt(1 + 4 * mP0[level] * mP*mQ * invFactor * invW0) / 2;
+	//mAlpha = 1 / 2 + sqrt(1 + 4 * mP0[level] * mP*mQ * invFactor * invW0) / 2;
+	mAlpha = 1 / 2 + sqrt(1 + 4 * 10 * mP*mQ * invFactor * invW0) / 2;
 }
 
 #endif

@@ -34,6 +34,7 @@ using namespace std;
 #define D3DFVF_CUSTOMVERTEX  (D3DFVF_XYZ | D3DFVF_TEX1)
 
 wchar_t					g_strFPS[50];
+double					max_naodu;
 IDirect3DDevice9		*device = 0;
 ID3DXFont				*pFont = NULL;
 D3DInputClass			*g_pD3DInput = NULL;
@@ -62,8 +63,8 @@ vector<double> E;
 vector<double> V;
 vector<double> K;
 vector<double> mP0; 
-const double mPi = 400000; 
-const double mQi = 400000; 
+const double mPi = 4000000; 
+const double mQi = 4000000; 
 const double mq = 1.1;
 const double mbeta = BasicLib::ToRadian(5.0);
 
@@ -89,7 +90,7 @@ VOID					Direct3D_Update(HWND hwnd);
 BOOL					Device_Read(IDirectInputDevice8 *pDIDevice, void* pBuffer, long lSize);
 float					Get_FPS();
 VOID					InputModel(TerrainModel &terrainModel);
-VOID					SagUpgrade(const vector<double>, const double, const double, const vector<double> &, const double, const double, const double);
+double					SagUpgrade(const vector<double>, const double, const double, const vector<double> &, const double, const double, const double);
 VOID					UpgradeInit();
 VOID					CalP0(vector<double> &P0);
 
@@ -237,7 +238,7 @@ HRESULT Objects_Init()
 	delete  kriging;
 	InputModel(terrainModel);
 	const int count = 8*terrainModel.m_gtp.m_GTPSet.size();
-	D3DXCreateFont(device, 18, 0, 0, 1, false, DEFAULT_CHARSET,
+	D3DXCreateFont(device, 40, 0, 0, 1, false, DEFAULT_CHARSET,
 		OUT_DEFAULT_PRECIS, DEFAULT_QUALITY, 0, _T("微软雅黑"), &pFont);
 	device->CreateVertexBuffer(3*count*sizeof(CUSTOMVERTEX), 0,
 		D3DFVF_CUSTOMVERTEX, D3DPOOL_MANAGED, &g_pVertexBuffer, 0);
@@ -256,7 +257,7 @@ HRESULT Objects_Init()
 	}
 	g_pVertexBuffer->Unlock();
 	CalP0(mP0);
-	SagUpgrade(mP0, mPi, mQi, K, mm, mq, mbeta);
+	max_naodu = SagUpgrade(mP0, mPi, mQi, K, mm, mq, mbeta);
 	UpgradeInit();
 
 	g_pCamera = new CameraClass(device);
@@ -391,50 +392,80 @@ void Direct3D_Render(HWND hwnd)
 		device->SetTexture(0, g_pTexture6);
 		device->DrawPrimitive(D3DPT_TRIANGLELIST, 5 * nums, nums);
 	}
-	int charCount = swprintf_s(g_strFPS, 20, _T("FPS:%0.0f"), Get_FPS());
+	int charCount = swprintf_s(g_strFPS, 30, _T(""));
 	pFont->DrawText(NULL, g_strFPS, charCount, &formatRect, DT_TOP | DT_LEFT, D3DCOLOR_XRGB(0, 0, 0));
 	UnitFrameStates();
 	device->EndScene();
 	device->Present(0, 0, 0, 0);
 }
 
-void SagUpgrade(const vector<double> P0, const double Pi, const double Qi, const vector<double> &K,
+double SagUpgrade(const vector<double> P0, const double Pi, const double Qi, const vector<double> &K,
 	const double m, const double q, const double beta)
 {
 	UTM = terrainModel;
 	shared_ptr<KeyLevel<double> > keylevel = make_shared<KeyLevel<double> >(E, H, V);
 	shared_ptr<Sag> sag = make_shared<Sag>(P0, Pi, Qi, K[keylevel->GetKeyLevel()], m, q, beta);
 	size_t z;
+	double max = 0.0, Z = 0.0;
 	int tmp = keylevel->GetKeyLevel();
-	for (z = 0; z < K.size() - keylevel->GetKeyLevel(); z++)
+	for (z = 0; z < K.size() - keylevel->GetKeyLevel() - 1; z++)
 	{
 		for (size_t x = 0; x < size_t(UTM.m_x); x++)
 		{
 			for (size_t y = 0; y < size_t(UTM.m_y); y++)
 			{
-				double Z = sag->Deflection(UTM.m_ver[z*UTM.m_x*UTM.m_y + y*UTM.m_x + x].x,
+				if (y == 0 || y == 14 || x == 0 || x == 12)
+					Z = sag->Deflection1(UTM.m_ver[z*UTM.m_x*UTM.m_y + y*UTM.m_x + x].x,
+					UTM.m_ver[z*UTM.m_x*UTM.m_y + y*UTM.m_x + x].y, z);
+				else
+					Z = sag->Deflection(UTM.m_ver[z*UTM.m_x*UTM.m_y + y*UTM.m_x + x].x,
 					UTM.m_ver[z*UTM.m_x*UTM.m_y + y*UTM.m_x + x].y, z);
 				if (Z < 0.00000)
 				{
 					Z *= -1;
 				}
+				if (Z > max && z == 0)
+				{
+					max = Z;
+				}
 				UTM.m_ver[z*UTM.m_x*UTM.m_y + y*UTM.m_x + x].SetZ(float(UTM.m_ver[z*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z - Z));
 			}
 		}
 	}
+	//std::cout << max << std::endl;
 	
 	//非弯曲带整体下移煤层的高度
-	for (; z < size_t(UTM.m_z - 1); z++)
+	double diffZ = 0.0;
+	/*for (size_t x = 0; x < size_t(UTM.m_x); x++)
+	{
+		for (size_t y = 0; y < size_t(UTM.m_y); y++)
+		{
+			diffZ = UTM.m_ver[(UTM.m_z - 1)*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z - UTM.m_ver[(UTM.m_z - 2)*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z;
+			UTM.m_ver[5*UTM.m_x*UTM.m_y + y*UTM.m_x + x].SetZ(float(UTM.m_ver[5*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z - diffZ));
+		}
+	}
+	for (size_t x = 0; x < size_t(UTM.m_x); x++)
+	{
+		for (size_t y = 0; y < size_t(UTM.m_y); y++)
+		{
+			std::cout << 6 * UTM.m_x*UTM.m_y + y*UTM.m_x + x << std::endl;
+			diffZ = UTM.m_ver[(UTM.m_z - 1)*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z - UTM.m_ver[(UTM.m_z - 2)*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z;
+			UTM.m_ver[6*UTM.m_x*UTM.m_y + y*UTM.m_x + x].SetZ(float(UTM.m_ver[6*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z - diffZ));
+		}
+	}*/
+	for (int zz = UTM.m_z; zz >= size_t(UTM.m_z-1); zz--)
 	{
 		for (size_t x = 0; x < size_t(UTM.m_x); x++)
 		{
 			for (size_t y = 0; y < size_t(UTM.m_y); y++)
 			{
-				double diffZ = UTM.m_ver[(UTM.m_z - 1)*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z - UTM.m_ver[(UTM.m_z - 2)*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z;
-				UTM.m_ver[z*UTM.m_x*UTM.m_y + y*UTM.m_x + x].SetZ(float(UTM.m_ver[z*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z + diffZ));
+				diffZ = UTM.m_ver[(UTM.m_z - 1)*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z - UTM.m_ver[(UTM.m_z - 2)*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z;
+				UTM.m_ver[zz*UTM.m_x*UTM.m_y + y*UTM.m_x + x].SetZ(float(UTM.m_ver[zz*UTM.m_x*UTM.m_y + y*UTM.m_x + x].z - diffZ));
 			}
 		}
 	}
+
+	return max;
 }
 
 void Direct3D_Update(HWND hwnd)
