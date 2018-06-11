@@ -4,24 +4,16 @@
 #include <sstream>
 #include <iostream>
 #include <fstream>
-#include "RWBase.h"
-
-#pragma region WriteBase
 
 template<typename T>
-class WriteBase : public RWBase<T>
+class WriteBase
 {
 public:
-	WriteBase():mOut() {}
-	WriteBase(std::string filename):mOut(filename.c_str(), std::ofstream::ate) {}
-	virtual void Execute(T, T, T) {};
-	virtual void SetFilename(std::string filename) { mFilename = filename; }
-	void Execute() {};
+	WriteBase(std::string filename):m_out(filename.c_str(), std::ofstream::ate) {}
+	void Write(T, T, T);
 
 protected:
-	std::ofstream mOut;
+	std::string m_filename;
+	std::ofstream m_out;
 };
-
-#pragma endregion
-
 #endif

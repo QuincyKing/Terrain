@@ -111,9 +111,8 @@ public:
 	}
 public:
 	uint32_t triangles[8];
-	static uint8_t GTPPoints;
 };
-uint8_t GTP::GTPPoints = 24;
+
 
 //пео╒
 class Info

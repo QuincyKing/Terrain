@@ -1,10 +1,13 @@
-#pragma once
+#ifndef KRIGING_H
+#define KRIGING_H
 
 #include "Matrix.h"
 #include "Numeric.h"
 #include "Interpolater.h"
 #include "BaseData.h"
-#include "RW/RWBuilder.h"
+#include "RW/ReaderTerrainData.h"
+#include "RW/WriteData.h"
+#include "RW/WriteInfo.h"
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -14,42 +17,64 @@
 #include <fstream>
 #include <sstream>
 
-#pragma region 声明
-extern std::vector<double> H;
-extern double mm;
+using namespace std;
+std::vector<double> H;
+double mm;
 
 template<class ForwardIterator>
-double GetDistance(const ForwardIterator start, int i, int j);
+double GetDistance(const ForwardIterator start, int i, int j)
+{
+	return sqrt(pow(((*(start + i)).x - (*(start + j)).x), 2) + pow(((*(start + i)).y - (*(start + j)).y), 2));
+}
 
 template<class ForwardIterator>
-double GetDistance(double xpos, double ypos, const ForwardIterator start, int i);
+double GetDistance(double xpos, double ypos, const ForwardIterator start, int i)
+{
+	return sqrt(pow(((*(start + i)).x - xpos), 2) + pow(((*(start + i)).y - ypos), 2));
+}
 
 template <class T, class ForwardIterator>
-double GetInterpolatedZ(double xpos, double ypos, ForwardIterator first, ForwardIterator last, int m_nSize, TMatrix<T> m_matA, std::vector<int> m_Permutation);
+double GetInterpolatedZ(double xpos, double ypos, ForwardIterator first, ForwardIterator last, int m_nSize, TMatrix<T> m_matA, vector<int> m_Permutation) throw(InterpolaterException)
+{
+	std::vector<double> vecB(m_nSize);
 
-void area(std::vector<double> vec, double& min, double& max);
+	for (int i = 0; i<m_nSize - 1; i++) {
+		double dist = GetDistance(xpos, ypos, first, i);
+		vecB[i] = dist;
+	}
+	vecB[m_nSize - 1] = 1;
 
-#pragma endregion
+	LUBackSub(m_matA, m_Permutation, vecB);
 
-#pragma region 克里金插值类
+	double z = 0;
+	for (int i = 0; i<m_nSize - 1; i++) {
+		double inputz = (*(first + i)).z;
+		z += vecB[i] * inputz;
+	}
+
+	return z;
+}
+
+void area(vector<double> vec, double& min, double& max)
+{
+	vector<double>::iterator iter;
+	iter = max_element(vec.begin(), vec.end());
+	max = *iter;
+
+	iter = min_element(vec.begin(), vec.end());
+	min = *iter;
+}
 
 template<class T, class ForwardIterator1, class ForwardIterator2>
 class TKriging : public TInterpolater<ForwardIterator2>
 {
 public:
-	TKriging(std::string TerrainDataFile)
+	TKriging()
 	{
-		ReaderTerrainData *temp = nullptr;
 		int levels;
-		ReaderTerrainData *rtd = new ReaderTerrainData();
-		RWBuilder<TerrainData> *TerrainDataReader =
-			new RWBuilder<TerrainData>(rtd, TerrainDataFile);
-		TerrainDataReader->Execute();
-		temp = dynamic_cast<ReaderTerrainData *>(TerrainDataReader->GetRWBase());
-		input = temp->GetData();
-		temp->GetLevels(levels);
-		delete TerrainDataReader;
-
+		ReaderTerrainData<> *rbvv = new ReaderTerrainData<>("terrainData.te");
+		input = rbvv->GetData();
+		rbvv->GetLevels(levels);
 		H.push_back(0.0);
 		for (size_t index = 0; index < input.size() - 1; index++)
 		{
@@ -62,29 +87,23 @@ public:
 		}
 		mm = mm / input[0].size();
 
-		ReaderInfo *ri = new ReaderInfo();
-		RWBuilder<Info> *InfoReader =
-					new RWBuilder<Info>(ri, "./info.te");
-		InfoReader->Execute();
-		ReaderInfo *infotemp = dynamic_cast<ReaderInfo *>(InfoReader->GetRWBase());
-		if (infotemp->HasData())
+		ReaderInfo<> *rdif = new ReaderInfo<>();
+		if (rdif->HasData())
 		{
 			return;
 		}
-		delete InfoReader;
-
 		ForwardIterator1 first1, last1;
 		first1 = input.begin();
 		last1 = input.end();
 		
-		std::vector<double> vecx;
-		std::vector<double> vecy;
+		vector<double> vecx;
+		vector<double> vecy;
 	
 		ForwardIterator1 start1 = first1;
 		int index_x = 0;
 		int countx = 0;
 		int county = 0;
-		WriteData<double> * wd = new WriteData<double>();
+		WriteData<double> *wd = new WriteData<double>();
 		while (start1 != last1) 
 		{
 			 int index_y = 0;
@@ -136,7 +155,7 @@ public:
 				{
 					countx++;
 					double z = GetInterpolatedZ(xpos, ypos, (*start1).begin(), (*start1).end(), m_nSize, m_matA, m_Permutation);
-					wd->Execute(xpos, ypos, z);
+					wd->Write(xpos, ypos, z);
 					xpos += width;
 				}
 				county++;
@@ -146,66 +165,19 @@ public:
 			index_x++;
 			++start1;
 		}
-		WriteInfo<int> * wi = new WriteInfo<int>();
-		wi->Execute(countx, county, index_x - 1);
-		delete wd;
+		WriteInfo<> *wi = new WriteInfo<>();
+		wi->Write(countx, county, index_x-1);
 		delete wi;
+		delete wd;
 	}
 
 private:
-	TMatrix<T>							m_matA;
-	std::vector<int>					m_Permutation;
-	int									m_nSize;
-	double								m_dSemivariance;
-	std::vector<std::vector<Point3D> >	input;
+	TMatrix<T>				 m_matA;
+	vector<int>				 m_Permutation;
+	int						 m_nSize;
+	double					 m_dSemivariance;
+	vector<vector<Point3D> > input;
 };
+typedef TKriging<double, vector<vector<Point3D> >::iterator, vector<Point3D>::iterator> Kriging;
 
-typedef TKriging<double, std::vector<std::vector<Point3D> >::iterator, std::vector<Point3D>::iterator> Kriging;
-
-#pragma endregion
-
-#pragma region 工具实现
-template<class ForwardIterator>
-double GetDistance(const ForwardIterator start, int i, int j)
-{
-	return sqrt(pow(((*(start + i)).x - (*(start + j)).x), 2) + pow(((*(start + i)).y - (*(start + j)).y), 2));
-}
-
-template<class ForwardIterator>
-double GetDistance(double xpos, double ypos, const ForwardIterator start, int i)
-{
-	return sqrt(pow(((*(start + i)).x - xpos), 2) + pow(((*(start + i)).y - ypos), 2));
-}
-
-template <class T, class ForwardIterator>
-double GetInterpolatedZ(double xpos, double ypos, ForwardIterator first, ForwardIterator last, int m_nSize, TMatrix<T> m_matA, std::vector<int> m_Permutation) throw(InterpolaterException)
-{
-	std::vector<double> vecB(m_nSize);
-
-	for (int i = 0; i<m_nSize - 1; i++) {
-		double dist = GetDistance(xpos, ypos, first, i);
-		vecB[i] = dist;
-	}
-	vecB[m_nSize - 1] = 1;
-
-	LUBackSub(m_matA, m_Permutation, vecB);
-
-	double z = 0;
-	for (int i = 0; i<m_nSize - 1; i++) {
-		double inputz = (*(first + i)).z;
-		z += vecB[i] * inputz;
-	}
-
-	return z;
-}
-
-void area(std::vector<double> vec, double& min, double& max)
-{
-	auto iter = max_element(vec.begin(), vec.end());
-	max = *iter;
-
-	iter = min_element(vec.begin(), vec.end());
-	min = *iter;
-}
-
-#pragma endregion
+#endif
