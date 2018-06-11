@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="RW">
+      <UniqueIdentifier>{044019e7-fa53-49c4-b4eb-5ee704cbebdf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BaseData.h">
@@ -54,29 +57,35 @@
     <ClInclude Include="Interpolater.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="RW\WriteBase.h">
+    <ClInclude Include="resource.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="TerrainUtility.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="RW\ReaderBase.h">
-      <Filter>头文件</Filter>
+      <Filter>RW</Filter>
     </ClInclude>
-    <ClInclude Include="RW\ReaderInfo.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="RW\ReaderData.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="RW\ReaderTerrainData.h">
-      <Filter>头文件</Filter>
+    <ClInclude Include="RW\WriteBase.h">
+      <Filter>RW</Filter>
     </ClInclude>
     <ClInclude Include="RW\WriteData.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="RW\ReaderPara.h">
-      <Filter>头文件</Filter>
+      <Filter>RW</Filter>
     </ClInclude>
     <ClInclude Include="RW\WriteInfo.h">
-      <Filter>头文件</Filter>
+      <Filter>RW</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\RWBuilder.h">
+      <Filter>RW</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\RWBase.h">
+      <Filter>RW</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\Reader.h">
+      <Filter>RW</Filter>
+    </ClInclude>
+    <ClInclude Include="RW\WriteLog.h">
+      <Filter>RW</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -89,5 +98,13 @@
     <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="TerrainUtility.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Terrain.rc">
+      <Filter>资源文件</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
