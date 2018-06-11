@@ -15,4 +15,4 @@
 </center>
 
 ### 建模流程图
-  ![pipe](http://jinqifeng.me/pic/terrain/2.jpg)
+  ![pipe](http://jinqifeng.me/pic/terrain/2.JPG)
